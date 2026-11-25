@@ -1,3 +1,4 @@
+const path = require("path");
 const dns = require("node:dns");
 
 dns.setServers(["8.8.8.8", "1.1.1.1"]);
@@ -11,6 +12,12 @@ const crypto = require("crypto");
 const Url = require("./models/Url");
 
 const app = express();
+const projectDir = process.env.NETLIFY
+    ? path.resolve(__dirname, "../..")
+    : __dirname;
+
+app.set("views", path.join(projectDir, "views"));
+app.use(express.static(path.join(projectDir, "public")));
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
