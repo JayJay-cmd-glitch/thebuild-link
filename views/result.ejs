@@ -1,0 +1,104 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Your Short Link | TheBuild Link</title>
+
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <a href="/" class="logo">
+            TheBuild<span>Link</span>
+        </a>
+
+        <a href="/" class="nav-button">
+            Shorten another
+        </a>
+    </header>
+
+    <main class="result-page">
+
+        <div class="result-card">
+
+            <div class="result-success">
+                ✓
+            </div>
+
+            <p class="section-label">YOUR LINK IS READY</p>
+
+            <h1>
+                Successfully <span>shortened!</span>
+            </h1>
+
+            <p class="result-description">
+                Your long URL has been transformed into a
+                shorter link you can share anywhere.
+            </p>
+
+            <label for="shortUrl">Your shortened URL</label>
+
+            <div class="result-input-group">
+
+                <input
+                    type="text"
+                    id="shortUrl"
+                    value="<%= shortUrl %>"
+                    readonly
+                >
+
+                <button
+                    type="button"
+                    onclick="copyShortLink()"
+                    class="copy-button"
+                >
+                    Copy
+                </button>
+
+            </div>
+
+            <p id="copyMessage" class="copy-message"></p>
+
+            <div class="result-original">
+                <strong>Original URL</strong>
+                <p><%= originalUrl %></p>
+            </div>
+
+            <a href="/" class="back-link">
+                ← Shorten another URL
+            </a>
+
+        </div>
+
+    </main>
+
+    <footer class="footer">
+        <a href="/" class="logo">
+            TheBuild<span>Link</span>
+        </a>
+
+        <p>© 2026 TheBuild Link</p>
+    </footer>
+
+    <script>
+        async function copyShortLink() {
+            const input = document.getElementById("shortUrl");
+            const message = document.getElementById("copyMessage");
+
+            try {
+                await navigator.clipboard.writeText(input.value);
+                message.textContent = "Link copied successfully!";
+            } catch (error) {
+                input.select();
+                document.execCommand("copy");
+                message.textContent = "Link copied!";
+            }
+        }
+    </script>
+
+</body>
+</html>
