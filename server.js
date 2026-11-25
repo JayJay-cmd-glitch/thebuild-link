@@ -14,9 +14,7 @@ const Url = require("./models/Url");
 const app = express();
 
 // Resolve project folders correctly for local development and Netlify
-const projectDir = process.env.NETLIFY
-    ? path.resolve(__dirname, "../..")
-    : __dirname;
+const projectDir = __dirname;
 
 // Express configuration
 app.set("view engine", "ejs");
