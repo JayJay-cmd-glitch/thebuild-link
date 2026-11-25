@@ -1,78 +1,69 @@
-
 const path = require("path");
-const dns = require("node:dns");
 const express = require("express");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
 require("dotenv").config();
 
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
-
 const Url = require("./models/Url");
-
 const app = express();
 
-// Resolve project folders correctly for local development and Netlify
+// In the Netlify bundle, server.js and the included views/public folders
+// are located under the function's task root.
 const projectDir = __dirname;
 
-// Express configuration
 app.set("view engine", "ejs");
 app.set("views", path.join(projectDir, "views"));
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(projectDir, "public")));
 
-// MongoDB connection
+// Reuse one MongoDB connection across warm Netlify function invocations.
 let dbConnectionPromise = null;
 
 async function connectDB() {
-    if (mongoose.connection.readyState === 1) {
-        return;
-    }
+    if (mongoose.connection.readyState === 1) return;
 
     if (!process.env.MONGO_URI) {
         throw new Error("MONGO_URI is missing from environment variables");
     }
 
     if (!dbConnectionPromise) {
-        dbConnectionPromise = mongoose.connect(process.env.MONGO_URI)
-            .catch((error) => {
-                dbConnectionPromise = null;
-                throw error;
-            });
+        dbConnectionPromise = mongoose.connect(process.env.MONGO_URI, {
+            // Small pool is appropriate for a low-traffic serverless app.
+            maxPoolSize: 5,
+            minPoolSize: 0,
+            maxIdleTimeMS: 20000,
+            // Fail before Netlify's 30-second function limit.
+            serverSelectionTimeoutMS: 10000,
+            connectTimeoutMS: 10000
+        }).catch((error) => {
+            dbConnectionPromise = null;
+            throw error;
+        });
     }
 
     await dbConnectionPromise;
 }
 
-// Homepage
-app.get("/", async (req, res) => {
-    try {
-        await connectDB();
-        res.render("index");
-    } catch (error) {
-        console.error("Homepage error:", error);
-        res.status(500).send("Database connection failed.");
-    }
+// Serve the homepage without waiting for MongoDB.
+// This keeps the public site available even while the database is reconnecting.
+app.get("/", (req, res) => {
+    res.render("index");
 });
 
-// Shorten URL
 app.post("/shorten", async (req, res) => {
     try {
         await connectDB();
 
         let originalUrl = req.body.originalUrl;
-
         if (!originalUrl) {
             return res.status(400).send("Please enter a URL.");
         }
 
         originalUrl = originalUrl.trim();
 
-        // Validate URL
         let parsedUrl;
-
         try {
             parsedUrl = new URL(originalUrl);
         } catch {
@@ -83,67 +74,46 @@ app.post("/shorten", async (req, res) => {
             return res.status(400).send("Only HTTP and HTTPS URLs are allowed.");
         }
 
-        // Generate short code
         const shortCode = crypto.randomBytes(5).toString("hex");
-
-        // Save URL
-        const newUrl = new Url({
-            originalUrl,
-            shortCode
-        });
-
-        await newUrl.save();
+        await new Url({ originalUrl, shortCode }).save();
 
         const siteUrl = (
-            process.env.SITE_URL ||
-            `${req.protocol}://${req.get("host")}`
+            process.env.SITE_URL || `${req.protocol}://${req.get("host")}`
         ).replace(/\/$/, "");
-
-        const shortUrl = `${siteUrl}/${shortCode}`;
 
         res.render("result", {
             originalUrl,
-            shortUrl,
+            shortUrl: `${siteUrl}/${shortCode}`,
             shortCode
         });
-
     } catch (error) {
         console.error("URL shortening error:", error);
-        res.status(500).send("Unable to shorten URL. Please try again.");
+        res.status(503).send("The database is temporarily unavailable. Please try again shortly.");
     }
 });
 
-// Redirect short URL
 app.get("/:shortCode", async (req, res) => {
     try {
         await connectDB();
 
-        const url = await Url.findOne({
-            shortCode: req.params.shortCode
-        });
-
+        const url = await Url.findOne({ shortCode: req.params.shortCode });
         if (!url) {
             return res.status(404).send("Shortened URL not found.");
         }
 
         url.clicks += 1;
         await url.save();
-
-        res.redirect(url.originalUrl);
-
+        return res.redirect(url.originalUrl);
     } catch (error) {
         console.error("Redirect error:", error);
-        res.status(500).send("Unable to redirect. Please try again.");
+        return res.status(503).send("The database is temporarily unavailable. Please try again shortly.");
     }
 });
 
-// Export app for Netlify
 module.exports = app;
 
-// Start local server
 if (require.main === module) {
     const PORT = process.env.PORT || 3000;
-
     connectDB()
         .then(() => {
             app.listen(PORT, () => {
