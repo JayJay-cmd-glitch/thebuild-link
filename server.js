@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const mongoose = require("mongoose");
@@ -8,15 +9,25 @@ require("dotenv").config();
 const Url = require("./models/Url");
 const app = express();
 
-// In the Netlify bundle, server.js and the included views/public folders
-// are located under the function's task root.
-const projectDir = __dirname;
+// When Netlify bundles this file into netlify/functions/api.js, __dirname
+// points at the functions folder, while `included_files` (views/**, public/**)
+// are placed at the function's task root. Resolve the folder that actually exists.
+function resolveDir(name) {
+    const candidates = [
+        path.join(__dirname, name),
+        path.join(__dirname, "..", "..", name),
+        process.env.LAMBDA_TASK_ROOT && path.join(process.env.LAMBDA_TASK_ROOT, name),
+        path.join(process.cwd(), name)
+    ].filter(Boolean);
+
+    return candidates.find((dir) => fs.existsSync(dir)) || candidates[0];
+}
 
 app.set("view engine", "ejs");
-app.set("views", path.join(projectDir, "views"));
+app.set("views", resolveDir("views"));
 
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(projectDir, "public")));
+app.use(express.static(resolveDir("public")));
 
 // Reuse one MongoDB connection across warm Netlify function invocations.
 let dbConnectionPromise = null;
