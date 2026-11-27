@@ -194,6 +194,17 @@ body {
     color: #aaaabc;
 }
 
+.input-error {
+    margin: 10px 2px 0;
+    color: #dc2626;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.input-wrapper input[aria-invalid="true"] {
+    color: #dc2626;
+}
+
 .shorten-button {
     width: 100%;
     height: 58px;
